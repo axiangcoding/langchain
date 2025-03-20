@@ -1,103 +1,268 @@
-/* eslint-disable react/jsx-props-no-spreading */
-import React from "react";
-import Tabs from "@theme/Tabs";
-import TabItem from "@theme/TabItem";
+/* eslint-disable react/jsx-props-no-spreading, react/destructuring-assignment */
+import React, { useState } from "react";
 import CodeBlock from "@theme-original/CodeBlock";
 
-function Setup({ apiKeyName, packageName }) {
-  const apiKeyText = `import getpass
-import os
+// Create a custom dropdown since Docusaurus's dropdown component isn't easily accessible
+export const CustomDropdown = ({ selectedOption, options, onSelect, modelType }) => {
+  const [isOpen, setIsOpen] = React.useState(false);
 
-os.environ["${apiKeyName}"] = getpass.getpass()`;
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (isOpen && !event.target.closest('.dropdown')) {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isOpen]);
+
+  // Determine the text and link based on the modelType
+  const getModelTextAndLink = () => {
+    switch (modelType) {
+      case 'chat':
+        return { text: 'chat model', link: '/docs/integrations/chat/' };
+      case 'embeddings':
+        return { text: 'embeddings model', link: '/docs/integrations/text_embedding/' };
+      case 'vectorstore':
+        return { text: 'vector store', link: '/docs/integrations/vectorstores/' };
+      default:
+        return { text: 'chat model', link: '/docs/integrations/chat/' };
+    }
+  };
+
+  const { text, link } = getModelTextAndLink();
+
   return (
-    <>
-      <h5>Install dependencies</h5>
-      <CodeBlock language="bash">{`pip install -qU ${packageName}`}</CodeBlock>
-      <h5>Set environment variables</h5>
-      <CodeBlock language="python">{apiKeyText}</CodeBlock>
-    </>
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: '1rem', gap: '0.75rem' }}>
+      <span style={{ 
+        fontSize: '1rem',
+        fontWeight: '500',
+      }}>
+        Select <a href={link}>{text}</a>:
+      </span>
+      <div className={`dropdown ${isOpen ? 'dropdown--show' : ''}`}>
+        <button 
+          className="button button--secondary" 
+          onClick={() => setIsOpen(!isOpen)}
+          style={{ 
+            backgroundColor: 'var(--ifm-background-color)',
+            border: '1px solid var(--ifm-color-emphasis-300)',
+            fontWeight: 'normal',
+            fontSize: '1rem',
+            padding: '0.5rem 1rem',
+            color: 'var(--ifm-font-color-base)',
+          }}
+        >
+          {selectedOption.label}
+          <span style={{ 
+            marginLeft: '0.4rem',
+            fontSize: '0.875rem'
+          }}>▾</span>
+        </button>
+        <div className="dropdown__menu" style={{
+          maxHeight: '210px',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          marginBottom: 0,
+        }}>
+          {options.map((option) => (
+            <li key={option.value}>
+              <a 
+                className={`dropdown__link ${option.value === selectedOption.value ? 'dropdown__link--active' : ''}`}
+                href="#" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  onSelect(option.value);
+                  setIsOpen(false);
+                }}
+              >
+                {option.label}
+              </a>
+            </li>
+          ))}
+        </div>
+      </div>
+    </div>
   );
-}
+};
+
 
 /**
- * @param {{ openaiParams?: string, anthropicParams?: string, fireworksParams?: string, mistralParams?: string, googleParams?: string, hideOpenai?: boolean, hideAnthropic?: boolean, hideFireworks?: boolean, hideMistral?: boolean, hideGoogle?: boolean }} props
+ * @typedef {Object} ChatModelTabsProps - Component props.
+ * @property {Object} [overrideParams] - An object for overriding the default parameters for each chat model, e.g. `{ openai: { model: "gpt-4o-mini" } }`
+ * @property {string} [customVarName] - Custom variable name for the model. Defaults to `model`.
+ */
+
+/**
+ * @param {ChatModelTabsProps} props - Component props.
  */
 export default function ChatModelTabs(props) {
+  const [selectedModel, setSelectedModel] = useState("openai");
   const {
-    openaiParams,
-    anthropicParams,
-    fireworksParams,
-    mistralParams,
-    googleParams,
-    hideOpenai,
-    hideAnthropic,
-    hideFireworks,
-    hideMistral,
-    hideGoogle,
+    overrideParams,
+    customVarName,
   } = props;
 
-  const openAIParamsOrDefault = openaiParams ?? `model="gpt-3.5-turbo-0125"`
-  const anthropicParamsOrDefault = anthropicParams ?? `model="claude-3-sonnet-20240229"`
-  const fireworksParamsOrDefault = fireworksParams ?? `model="accounts/fireworks/models/mixtral-8x7b-instruct"`
-  const mistralParamsOrDefault = mistralParams ?? `model="mistral-large-latest"`
-  const googleParamsOrDefault = googleParams ?? `model="gemini-pro"`
+  const llmVarName = customVarName ?? "model";
 
   const tabItems = [
     {
-      value: "OpenAI",
+      value: "openai",
       label: "OpenAI",
-      text: `from langchain_openai import ChatOpenAI\n\nmodel = ChatOpenAI(${openAIParamsOrDefault})`,
+      model: "gpt-4o-mini",
       apiKeyName: "OPENAI_API_KEY",
-      packageName: "langchain-openai",
-      default: true,
-      shouldHide: hideOpenai,
+      packageName: "langchain[openai]",
     },
     {
-      value: "Anthropic",
+      value: "anthropic",
       label: "Anthropic",
-      text: `from langchain_anthropic import ChatAnthropic\n\nmodel = ChatAnthropic(${anthropicParamsOrDefault})`,
+      model: "claude-3-5-sonnet-latest",
       apiKeyName: "ANTHROPIC_API_KEY",
-      packageName: "langchain-anthropic",
-      default: false,
-      shouldHide: hideAnthropic,
+      packageName: "langchain[anthropic]",
     },
     {
-      value: "FireworksAI",
-      label: "FireworksAI",
-      text: `from langchain_fireworks import ChatFireworks\n\nmodel = ChatFireworks(${fireworksParamsOrDefault})`,
+      value: "azure",
+      label: "Azure",
+      text: `from langchain_openai import AzureChatOpenAI
+
+${llmVarName} = AzureChatOpenAI(
+    azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+    azure_deployment=os.environ["AZURE_OPENAI_DEPLOYMENT_NAME"],
+    openai_api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+)`,
+      apiKeyName: "AZURE_OPENAI_API_KEY",
+      packageName: "langchain[openai]",
+    },
+    {
+      value: "google_vertexai",
+      label: "Google Vertex",
+      model: "gemini-2.0-flash-001",
+      apiKeyText: "# Ensure your VertexAI credentials are configured",
+      packageName: "langchain[google-vertexai]",
+    },
+    {
+      value: "bedrock_converse",
+      label: "AWS",
+      model: "anthropic.claude-3-5-sonnet-20240620-v1:0",
+      apiKeyText: "# Ensure your AWS credentials are configured",
+      packageName: "langchain[aws]",
+    },
+    {
+      value: "groq",
+      label: "Groq",
+      model: "llama3-8b-8192",
+      apiKeyName: "GROQ_API_KEY",
+      packageName: "langchain[groq]",
+    },
+    {
+      value: "cohere",
+      label: "Cohere",
+      model: "command-r-plus",
+      apiKeyName: "COHERE_API_KEY",
+      packageName: "langchain[cohere]",
+    },
+    {
+      value: "nvidia",
+      label: "NVIDIA",
+      model: "meta/llama3-70b-instruct",
+      apiKeyName: "NVIDIA_API_KEY",
+      packageName: "langchain-nvidia-ai-endpoints",
+    },
+    {
+      value: "fireworks",
+      label: "Fireworks AI",
+      model: "accounts/fireworks/models/llama-v3p1-70b-instruct",
       apiKeyName: "FIREWORKS_API_KEY",
-      packageName: "langchain-fireworks",
-      default: false,
-      shouldHide: hideFireworks,
+      packageName: "langchain[fireworks]",
     },
     {
-      value: "MistralAI",
-      label: "MistralAI",
-      text: `from langchain_mistralai import ChatMistralAI\n\nmodel = ChatMistralAI(${mistralParamsOrDefault})`,
+      value: "mistralai",
+      label: "Mistral AI",
+      model: "mistral-large-latest",
       apiKeyName: "MISTRAL_API_KEY",
-      packageName: "langchain-mistralai",
-      default: false,
-      shouldHide: hideMistral,
+      packageName: "langchain[mistralai]",
     },
     {
-      value: "Google",
-      label: "Google",
-      text: `from langchain_google_genai import ChatGoogleGenerativeAI\n\nmodel = ChatGoogleGenerativeAI(${googleParamsOrDefault})`,
-      apiKeyName: "GOOGLE_API_KEY",
-      packageName: "langchain-google-genai",
-      default: false,
-      shouldHide: hideGoogle,
-    }
-  ]
+      value: "together",
+      label: "Together AI",
+      model: "mistralai/Mixtral-8x7B-Instruct-v0.1",
+      apiKeyName: "TOGETHER_API_KEY",
+      packageName: "langchain[together]",
+    },
+    {
+      value: "ibm",
+      label: "IBM watsonx",
+      text: `from langchain_ibm import ChatWatsonx
+
+${llmVarName} = ChatWatsonx(
+    model_id="ibm/granite-34b-code-instruct", 
+    url="https://us-south.ml.cloud.ibm.com", 
+    project_id="<WATSONX PROJECT_ID>"
+)`,
+      apiKeyName: "WATSONX_APIKEY",
+      packageName: "langchain-ibm",
+    },
+    {
+      value: "databricks",
+      label: "Databricks",
+      text: `from databricks_langchain import ChatDatabricks\n\nos.environ["DATABRICKS_HOST"] = "https://example.staging.cloud.databricks.com/serving-endpoints"\n\n${llmVarName} = ChatDatabricks(endpoint="databricks-meta-llama-3-1-70b-instruct")`,
+      apiKeyName: "DATABRICKS_TOKEN",
+      packageName: "databricks-langchain",
+    },
+    {
+      value: "xai",
+      label: "xAI",
+      model: "grok-2",
+      apiKeyName: "XAI_API_KEY",
+      packageName: "langchain-xai",
+    },
+  ].map((item) => ({
+    ...item,
+    ...overrideParams?.[item.value],
+  }));
+
+  const modelOptions = tabItems
+  .map((item) => ({
+    value: item.value,
+    label: item.label,
+  }));
+
+  const selectedTabItem = tabItems.find(
+    (option) => option.value === selectedModel
+  );
+
+let apiKeyText = "";
+if (selectedTabItem.apiKeyName) {
+  apiKeyText = `import getpass
+import os
+
+if not os.environ.get("${selectedTabItem.apiKeyName}"):
+  os.environ["${selectedTabItem.apiKeyName}"] = getpass.getpass("Enter API key for ${selectedTabItem.label}: ")`;
+  } else if (selectedTabItem.apiKeyText) {
+    apiKeyText = selectedTabItem.apiKeyText;
+  }
+
+  const initModelText = selectedTabItem?.text || `from langchain.chat_models import init_chat_model
+
+${llmVarName} = init_chat_model("${selectedTabItem.model}", model_provider="${selectedTabItem.value}"${selectedTabItem?.kwargs ? `, ${selectedTabItem.kwargs}` : ""})`;
 
   return (
-    <Tabs groupId="modelTabs">
-      {tabItems.filter((tabItem) => !tabItem.shouldHide).map((tabItem) => (
-        <TabItem value={tabItem.value} label={tabItem.label} default={tabItem.default}>
-          <Setup apiKeyName={tabItem.apiKeyName} packageName={tabItem.packageName} />
-          <CodeBlock language="python">{tabItem.text}</CodeBlock>
-        </TabItem>
-      ))}
-    </Tabs>
+    <div>
+      <CustomDropdown 
+        selectedOption={selectedTabItem}
+        options={modelOptions}
+        onSelect={setSelectedModel}
+        modelType="chat"
+      />
+
+      <CodeBlock language="bash">
+        {`pip install -qU "${selectedTabItem.packageName}"`}
+      </CodeBlock>
+      <CodeBlock language="python">
+        {apiKeyText ? apiKeyText + "\n\n" + initModelText : initModelText}
+      </CodeBlock>
+    </div>
   );
 }

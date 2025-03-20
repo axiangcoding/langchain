@@ -15,14 +15,6 @@ def friendli_chat() -> ChatFriendli:
     return ChatFriendli(temperature=0, max_tokens=10)
 
 
-def test_friendli_call(friendli_chat: ChatFriendli) -> None:
-    """Test call."""
-    message = HumanMessage(content="What is generative AI?")
-    output = friendli_chat([message])
-    assert isinstance(output, AIMessage)
-    assert isinstance(output.content, str)
-
-
 def test_friendli_invoke(friendli_chat: ChatFriendli) -> None:
     """Test invoke."""
     output = friendli_chat.invoke("What is generative AI?")
@@ -48,7 +40,10 @@ def test_friendli_batch(friendli_chat: ChatFriendli) -> None:
 async def test_friendli_abatch(friendli_chat: ChatFriendli) -> None:
     """Test async batch."""
     outputs = await friendli_chat.abatch(
-        ["What is generative AI?", "What is generative AI?"]
+        [
+            "What is generative AI?",
+            "What is generative AI?",
+        ]
     )
     for output in outputs:
         assert isinstance(output, AIMessage)
